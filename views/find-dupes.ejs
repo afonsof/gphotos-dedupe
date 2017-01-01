@@ -1,0 +1,19 @@
+<table>
+    <% for(var i = 0; i < dupes.length; i++) {
+        var dupe = dupes[i] %>
+    <tr>
+        <% for(var j = 0;  j < dupe.images.length; j++) { %>
+        <td width="33%">
+            <img width="100%" src="<%= dupe.images[j] %>">
+        </td>
+        <% } %>
+    </tr>
+    <tr>
+        <% for(var j = 0;  j < dupe.images.length; j++) { %>
+        <td width="33%">
+            <%=dupe.title %> <%= new Date(dupe.timestamp[j]/1000) %> - <%=dupe.width%>X<%=dupe.height%>
+        </td>
+        <% } %>
+    </tr>
+    <% } %>
+</table>
