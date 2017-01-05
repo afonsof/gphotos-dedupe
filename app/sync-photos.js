@@ -1,14 +1,11 @@
-var Picasa = require('./src/picasa.js');
+var Picasa = require('./utils/picasa.js');
 var picasa = new Picasa();
-var MongoClient = require('mongodb').MongoClient;
-var _ = require('lodash');
 var async = require("async");
 
-var mongoUrl = 'mongodb://localhost:27017/gphotos-dedup';
-var pageSize = 100;
+const pageSize = 100;
 
 function processAlbumPage(data, callback) {
-    console.log('album : ' + data.album.title + ' photos ' + data.i + ' to ' + (data.i + pageSize));
+    data.writeFn('album : ' + data.album.title + ' - photos:' + data.album.num_photos + '. photos ' + data.i + ' to ' + (data.i + pageSize));
 
     try {
         picasa.getPhotos(data.token.access_token, {
@@ -18,7 +15,7 @@ function processAlbumPage(data, callback) {
             thumbsize: '32u'
         }, function (error, photos) {
             if (error) {
-                console.log(error);
+                data.writeFn(error);
                 callback();
                 return;
             }
@@ -31,33 +28,35 @@ function processAlbumPage(data, callback) {
             callback();
         });
     }
-    catch (e){
+    catch (e) {
         console.log(e);
         callback();
     }
 }
 
-
-MongoClient.connect(mongoUrl, function (err, db) {
+module.exports = function (db, callback, writeFn) {
     var dbToken = db.collection('tokens');
     var dbAlbum = db.collection('albums');
     dbToken.findOne(function (err, token) {
         dbAlbum.find(function (err, albums) {
-            var queue = async.queue(processAlbumPage, 10);
+            var queue = async.queue(processAlbumPage);
 
             albums.forEach(function (album) {
-                console.log('album : ' + album.title + ' - photos:' + album.num_photos);
-
                 for (var i = 0; i < album.num_photos; i += pageSize) {
                     queue.push({
                         album: album,
                         i: i,
                         pageSize: pageSize,
                         token: token,
-                        db: db
+                        db: db,
+                        writeFn: writeFn
                     });
                 }
             });
+
+            queue.drain = function () {
+                callback();
+            };
         });
     });
-});
+};

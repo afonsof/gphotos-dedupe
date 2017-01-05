@@ -11,8 +11,6 @@ function executeRequest(method, requestOptions, callback) {
 
             unknownError.statusCode = response.statusCode;
             unknownError.body = body;
-            console.log('Error: ' + response.statusCode + body);
-
             return callback(unknownError)
         }
 

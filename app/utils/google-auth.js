@@ -1,5 +1,5 @@
 var google = require('googleapis');
-var config = require('../config.json');
+var config = require('../../config.json');
 
 function getOAuthClient() {
     var OAuth2 = google.auth.OAuth2;
@@ -15,7 +15,6 @@ module.exports = {
         var client = getOAuthClient();
 
         var scopes = [
-            'https://www.googleapis.com/auth/plus.me',
             'https://picasaweb.google.com/data/'
         ];
 

@@ -2,7 +2,7 @@
 
 const querystring = require('querystring');
 
-const executeRequest = require('./executeRequest');
+const executeRequest = require('./execute-request');
 
 const GOOGLE_AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/auth';
 const GOOGLE_API_HOST = 'https://www.googleapis.com';
@@ -41,7 +41,7 @@ function deletePhoto(accessToken, albumId, photoId, callback) {
         }
     };
 
-    this.executeRequest('del', requestOptions, callback)
+    executeRequest('del', requestOptions, callback)
 }
 
 function postPhoto(accessToken, albumId, photoData, callback) {
@@ -74,16 +74,12 @@ function postPhoto(accessToken, albumId, photoData, callback) {
 }
 
 
-function getAlbums(accessToken, options, callback) {
+function getAlbums(accessToken, callback) {
     const accessTokenParams = {
         alt: FETCH_AS_JSON,
         access_token: accessToken
     };
-
-    options = options || {};
-
-    if (options.maxResults) accessTokenParams['max-results'] = options.maxResults;
-
+    
     const requestQuery = querystring.stringify(accessTokenParams);
 
     const requestOptions = {
@@ -93,7 +89,7 @@ function getAlbums(accessToken, options, callback) {
         }
     };
 
-    this.executeRequest('get', requestOptions, function (error, body) {
+    executeRequest('get', requestOptions, function (error, body) {
         if (error) return callback(error);
 
         const albums = body.feed.entry.map(getAlbumByEntry);
@@ -126,7 +122,7 @@ function getPhotos(accessToken, options, callback) {
         }
     };
 
-    this.executeRequest('get', requestOptions, function (error, body) {
+    executeRequest('get', requestOptions, function (error, body) {
         if (error) return callback(error);
 
         const photos = body.feed.entry.map(getPhotoByEntry);

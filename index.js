@@ -1,102 +1,74 @@
-var Picasa = require('./src/picasa.js');
-var picasa = new Picasa();
-var MongoClient = require('mongodb').MongoClient;
-var _ = require('lodash');
+var Picasa = require('./app/utils/picasa.js');
 var cookieParser = require('cookie-parser');
-
-
-var googleAuth = require('./src/googleAuth');
-
+var mongoConnection = require('./app/utils/mongo-connection');
+var googleAuth = require('./app/utils/google-auth');
 var express = require('express');
+
+var picasa = new Picasa();
 var app = express();
 
+module.exports = function () {
+
 //View
-app.engine('html', require('ejs').renderFile);
-app.set('view engine', 'ejs');
+    app.engine('html', require('ejs').renderFile);
+    app.set('view engine', 'ejs');
 
 //Middlewares
-app.use(cookieParser());
+    app.use(cookieParser());
 
-var mongoUrl = 'mongodb://localhost:27017/gphotos-dedup';
-
-app.get('/google-login', function (req, res) {
-    res.redirect(googleAuth.generateAuthUrl());
-});
-
-app.get('/google-login-redirect', function (req, res, next) {
-    googleAuth.getToken(req.query.code, function (err, tokens) {
-        if (!err) {
-            MongoClient.connect(mongoUrl, function (err, db) {
-                var dbTokens = db.collection('tokens');
-                dbTokens.drop();
-                dbTokens.insertOne(tokens);
-            });
-            res.send('OK');
-        }
-        else {
-            res.send('ERROR');
-        }
-        next();
+    app.get('/google-login', function (req, res) {
+        res.redirect(googleAuth.generateAuthUrl());
     });
-});
 
-app.get('/get-photos', function (req, res, next) {
-    var access_token = req.cookies.access_token;
-    if (!access_token) {
-        res.send('access_token does not exist');
-    }
-    picasa.getPhotos(access_token, options, function (error, photos) {
-        res.render('get-photos.ejs', {photos: photos});
-    });
-});
-
-app.get('/get-albums', function (req, res, next) {
-    MongoClient.connect(mongoUrl, function (err, db) {
-        var dbTokens = db.collection('tokens');
-        dbTokens.findOne(function (err, token) {
-
-            picasa.getAlbums(token.access_token, {}, function (error, albums) {
-                var dbAlbums = db.collection('albums');
-                dbAlbums.drop();
-                dbAlbums.insertMany(albums);
+    app.get('/google-login-redirect', function (req, res, next) {
+        googleAuth.getToken(req.query.code, function (err, tokens) {
+            if (!err) {
+                mongoConnection(function (err, db) {
+                    var dbTokens = db.collection('tokens');
+                    dbTokens.drop();
+                    dbTokens.insertOne(tokens);
+                });
                 res.send('OK');
+            }
+            else {
+                res.send('ERROR');
+            }
+            next();
+        });
+    });
+
+    app.get('/find-dupes', function (req, res) {
+        mongoConnection(function (err, db) {
+            db.collection('photos').aggregate([{
+                $match: {
+                    dhash: {$ne: null}
+                }
+            }, {
+                $group: {
+                    _id: {dhash: "$dhash"},
+                    width: {$addToSet: "$width"},
+                    height: {$addToSet: "$height"},
+                    title: {$addToSet: "$title"},
+                    timestamp: {$addToSet: "$timestamp"},
+                    images: {$addToSet: "$content.src"},
+                    count: {$sum: 1}
+                }
+            }, {
+                $match: {
+                    count: {$gte: 2}
+                }
+            }, {
+                $sort: {count: -1}
+            }, {
+                $limit: 100
+            }], function (err, dupes) {
+                res.render('find-dupes.ejs', {dupes: dupes})
             });
         });
     });
-});
 
-app.get('/find-dupes', function (req, res, next) {
-    MongoClient.connect(mongoUrl, function (err, db) {
 
-        db.collection('photos').aggregate([{
-            $match: {
-                dhash: {$ne: null}
-            }
-        }, {
-            $group: {
-                _id: {dhash: "$dhash"},
-                width: {$addToSet: "$width"},
-                height: {$addToSet: "$height"},
-                title: {$addToSet: "$title"},
-                timestamp: {$addToSet: "$timestamp"},
-                images: {$addToSet: "$content.src"},
-                count: {$sum: 1}
-            }
-        }, {
-            $match: {
-                count: {$gte: 2}
-            }
-        }, {
-            $sort: {count: -1}
-        }, {
-            $limit: 100
-        }], function (err, dupes) {
-            res.render('find-dupes.ejs', {dupes: dupes})
-        });
+    app.listen(3000, function () {
+        console.log('Example app listening on port 3000!')
     });
-});
-
-
-app.listen(3000, function () {
-    console.log('Example app listening on port 3000!')
-});
+};
